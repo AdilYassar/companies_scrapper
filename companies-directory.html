@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companies Directory - Romania & Italy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Companies Directory</h1>
+                    <p class="text-gray-600 mt-1">Discover IT companies in Romania and Italy</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span class="text-sm text-gray-600">Live Data</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search and Filters -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Search -->
+                <div class="relative">
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search companies..."
+                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Country Filter -->
+                <div>
+                    <select id="countryFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Countries</option>
+                        <option value="RO">Romania</option>
+                        <option value="IT">Italy</option>
+                    </select>
+                </div>
+
+                <!-- City Filter -->
+                <div>
+                    <select id="cityFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Cities</option>
+                    </select>
+                </div>
+
+                <!-- Industry Filter -->
+                <div>
+                    <select id="industryFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Industries</option>
+                        <option value="software">Software Development</option>
+                        <option value="consulting">IT Consulting</option>
+                        <option value="mobile">Mobile Development</option>
+                        <option value="web">Web Development</option>
+                        <option value="digital">Digital Marketing</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Active Filters -->
+            <div id="activeFilters" class="mt-4 flex flex-wrap gap-2 hidden">
+                <span class="text-sm text-gray-600">Active filters:</span>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i class="fas fa-building text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-600">Total Companies</p>
+                        <p id="totalCompanies" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <i class="fas fa-flag text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-600">Romania</p>
+                        <p id="romaniaCount" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-red-100 rounded-lg">
+                        <i class="fas fa-flag text-red-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-600">Italy</p>
+                        <p id="italyCount" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-yellow-100 rounded-lg">
+                        <i class="fas fa-star text-yellow-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-600">Avg Quality</p>
+                        <p id="avgQuality" class="text-2xl font-bold text-gray-900">0%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Loading companies...</p>
+        </div>
+
+        <!-- Companies Grid -->
+        <div id="companiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+            <!-- Company cards will be inserted here -->
+        </div>
+
+        <!-- No Results -->
+        <div id="noResults" class="text-center py-12 hidden">
+            <i class="fas fa-search text-gray-300 text-6xl mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">No companies found</h3>
+            <p class="text-gray-600">Try adjusting your search or filter criteria.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="mt-8 flex justify-center hidden">
+            <nav class="flex items-center space-x-1">
+                <button id="prevBtn" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div id="pageNumbers" class="flex">
+                    <!-- Page numbers will be inserted here -->
+                </div>
+                <button id="nextBtn" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Company Modal -->
+    <div id="companyModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modalTitle" class="text-lg font-semibold text-gray-900"></h3>
+                    <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div id="modalContent" class="text-gray-700">
+                    <!-- Modal content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const SUPABASE_URL = 'https://trswttabgkzbyggvtsxz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyc3d0dGFiZ2t6YnlnZ3Z0c3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxNjE1NzQsImV4cCI6MjA3NTczNzU3NH0.pAZnq2xLMwJeEp_3jCFKQ_uujVUVe3i-U-lF9a3u_pk';
+
+        // Initialize Supabase client
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // State management
+        let allCompanies = [];
+        let filteredCompanies = [];
+        let currentPage = 1;
+        const companiesPerPage = 12;
+
+        // DOM elements
+        const searchInput = document.getElementById('searchInput');
+        const countryFilter = document.getElementById('countryFilter');
+        const cityFilter = document.getElementById('cityFilter');
+        const industryFilter = document.getElementById('industryFilter');
+        const companiesGrid = document.getElementById('companiesGrid');
+        const loading = document.getElementById('loading');
+        const noResults = document.getElementById('noResults');
+        const pagination = document.getElementById('pagination');
+        const totalCompanies = document.getElementById('totalCompanies');
+        const romaniaCount = document.getElementById('romaniaCount');
+        const italyCount = document.getElementById('italyCount');
+        const avgQuality = document.getElementById('avgQuality');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCompanies();
+            setupEventListeners();
+        });
+
+        // Load companies from Supabase
+        async function loadCompanies() {
+            try {
+                showLoading();
+
+                const { data, error } = await supabaseClient
+                    .from('companies')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                allCompanies = data || [];
+                populateCityFilter();
+                updateStats();
+                applyFilters();
+
+            } catch (error) {
+                console.error('Error loading companies:', error);
+                showError('Failed to load companies. Please try again later.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Populate city filter with unique cities
+        function populateCityFilter() {
+            const cities = [...new Set(allCompanies.map(c => c.city).filter(Boolean))].sort();
+            cityFilter.innerHTML = '<option value="">All Cities</option>';
+            cities.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                cityFilter.appendChild(option);
+            });
+        }
+
+        // Update statistics
+        function updateStats() {
+            totalCompanies.textContent = allCompanies.length;
+            romaniaCount.textContent = allCompanies.filter(c => c.country === 'RO').length;
+            italyCount.textContent = allCompanies.filter(c => c.country === 'IT').length;
+
+            const avgScore = allCompanies.length > 0
+                ? Math.round(allCompanies.reduce((sum, c) => sum + (c.data_quality_score || 0), 0) / allCompanies.length)
+                : 0;
+            avgQuality.textContent = `${avgScore}%`;
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            searchInput.addEventListener('input', debounce(applyFilters, 300));
+            countryFilter.addEventListener('change', applyFilters);
+            cityFilter.addEventListener('change', applyFilters);
+            industryFilter.addEventListener('change', applyFilters);
+
+            // Modal close
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('companyModal').classList.add('hidden');
+            });
+
+            // Close modal on outside click
+            document.getElementById('companyModal').addEventListener('click', (e) => {
+                if (e.target === document.getElementById('companyModal')) {
+                    document.getElementById('companyModal').classList.add('hidden');
+                }
+            });
+        }
+
+        // Apply filters and search
+        function applyFilters() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCountry = countryFilter.value;
+            const selectedCity = cityFilter.value;
+            const selectedIndustry = industryFilter.value;
+
+            filteredCompanies = allCompanies.filter(company => {
+                // Search filter
+                const matchesSearch = !searchTerm ||
+                    company.company_name?.toLowerCase().includes(searchTerm) ||
+                    company.description?.toLowerCase().includes(searchTerm) ||
+                    company.city?.toLowerCase().includes(searchTerm) ||
+                    company.industry?.toLowerCase().includes(searchTerm);
+
+                // Country filter
+                const matchesCountry = !selectedCountry || company.country === selectedCountry;
+
+                // City filter
+                const matchesCity = !selectedCity || company.city === selectedCity;
+
+                // Industry filter
+                const matchesIndustry = !selectedIndustry ||
+                    company.industry?.toLowerCase().includes(selectedIndustry) ||
+                    company.description?.toLowerCase().includes(selectedIndustry);
+
+                return matchesSearch && matchesCountry && matchesCity && matchesIndustry;
+            });
+
+            currentPage = 1;
+            renderCompanies();
+            renderPagination();
+        }
+
+        // Render companies
+        function renderCompanies() {
+            const startIndex = (currentPage - 1) * companiesPerPage;
+            const endIndex = startIndex + companiesPerPage;
+            const companiesToShow = filteredCompanies.slice(startIndex, endIndex);
+
+            if (companiesToShow.length === 0) {
+                showNoResults();
+                return;
+            }
+
+            hideNoResults();
+            companiesGrid.innerHTML = '';
+
+            companiesToShow.forEach(company => {
+                const card = createCompanyCard(company);
+                companiesGrid.appendChild(card);
+            });
+
+            companiesGrid.classList.remove('hidden');
+        }
+
+        // Create company card
+        function createCompanyCard(company) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer';
+            card.onclick = () => showCompanyModal(company);
+
+            const countryFlag = company.country === 'RO' ? '🇷🇴' : '🇮🇹';
+            const countryName = company.country === 'RO' ? 'Romania' : 'Italy';
+
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">${company.company_name || 'N/A'}</h3>
+                        <div class="flex items-center text-sm text-gray-600 mb-2">
+                            <span class="mr-2">${countryFlag} ${countryName}</span>
+                            ${company.city ? `<span>• ${company.city}</span>` : ''}
+                        </div>
+                    </div>
+                    ${company.data_quality_score ? `
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <span class="text-xs font-semibold text-green-600">${company.data_quality_score}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                ${company.description ? `
+                    <p class="text-gray-600 text-sm mb-4 line-clamp-2">${company.description}</p>
+                ` : ''}
+
+                <div class="flex flex-wrap gap-1 mb-4">
+                    ${company.technologies?.slice(0, 3).map(tech =>
+                        `<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">${tech}</span>`
+                    ).join('') || ''}
+                    ${company.technologies?.length > 3 ? `<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+${company.technologies.length - 3}</span>` : ''}
+                </div>
+
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        ${company.website ? `
+                            <a href="${company.website}" target="_blank" class="text-blue-600 hover:text-blue-800 flex items-center" onclick="event.stopPropagation()">
+                                <i class="fas fa-globe mr-1"></i> Website
+                            </a>
+                        ` : ''}
+                        ${company.linkedin_url ? `
+                            <a href="${company.linkedin_url}" target="_blank" class="text-blue-600 hover:text-blue-800 flex items-center" onclick="event.stopPropagation()">
+                                <i class="fab fa-linkedin mr-1"></i> LinkedIn
+                            </a>
+                        ` : ''}
+                    </div>
+                    ${company.email ? `
+                        <div class="text-gray-500">
+                            <i class="fas fa-envelope mr-1"></i> Contact
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Show company modal
+        function showCompanyModal(company) {
+            const modal = document.getElementById('companyModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = company.company_name || 'Company Details';
+
+            const countryFlag = company.country === 'RO' ? '🇷🇴' : '🇮🇹';
+            const countryName = company.country === 'RO' ? 'Romania' : 'Italy';
+
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Basic Information</h4>
+                            <div class="space-y-2 text-sm">
+                                <p><span class="font-medium">Country:</span> ${countryFlag} ${countryName}</p>
+                                ${company.city ? `<p><span class="font-medium">City:</span> ${company.city}</p>` : ''}
+                                ${company.region ? `<p><span class="font-medium">Region:</span> ${company.region}</p>` : ''}
+                                ${company.industry ? `<p><span class="font-medium">Industry:</span> ${company.industry}</p>` : ''}
+                                ${company.data_quality_score ? `<p><span class="font-medium">Data Quality:</span> ${company.data_quality_score}/100</p>` : ''}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Contact Information</h4>
+                            <div class="space-y-2 text-sm">
+                                ${company.website ? `<p><span class="font-medium">Website:</span> <a href="${company.website}" target="_blank" class="text-blue-600 hover:underline">${company.website}</a></p>` : ''}
+                                ${company.email ? `<p><span class="font-medium">Email:</span> <a href="mailto:${company.email}" class="text-blue-600 hover:underline">${company.email}</a></p>` : ''}
+                                ${company.phone ? `<p><span class="font-medium">Phone:</span> ${company.phone}</p>` : ''}
+                                ${company.linkedin_url ? `<p><span class="font-medium">LinkedIn:</span> <a href="${company.linkedin_url}" target="_blank" class="text-blue-600 hover:underline">View Profile</a></p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${company.description ? `
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Description</h4>
+                            <p class="text-sm text-gray-600">${company.description}</p>
+                        </div>
+                    ` : ''}
+
+                    ${company.technologies?.length ? `
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Technologies</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${company.technologies.map(tech =>
+                                    `<span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">${tech}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${company.specialties?.length ? `
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Specialties</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${company.specialties.map(specialty =>
+                                    `<span class="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">${specialty}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${company.address ? `
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Address</h4>
+                            <p class="text-sm text-gray-600">${company.address}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
+        // Render pagination
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredCompanies.length / companiesPerPage);
+
+            if (totalPages <= 1) {
+                pagination.classList.add('hidden');
+                return;
+            }
+
+            pagination.classList.remove('hidden');
+
+            const pageNumbers = document.getElementById('pageNumbers');
+            pageNumbers.innerHTML = '';
+
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const button = document.createElement('button');
+                button.className = `px-3 py-2 text-sm font-medium border ${
+                    i === currentPage
+                        ? 'text-blue-600 bg-blue-50 border-blue-500'
+                        : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-50'
+                }`;
+                button.textContent = i;
+                button.onclick = () => {
+                    currentPage = i;
+                    renderCompanies();
+                    renderPagination();
+                };
+                pageNumbers.appendChild(button);
+            }
+
+            document.getElementById('prevBtn').onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCompanies();
+                    renderPagination();
+                }
+            };
+
+            document.getElementById('nextBtn').onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderCompanies();
+                    renderPagination();
+                }
+            };
+
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+        }
+
+        // Utility functions
+        function showLoading() {
+            loading.classList.remove('hidden');
+            companiesGrid.classList.add('hidden');
+            noResults.classList.add('hidden');
+        }
+
+        function hideLoading() {
+            loading.classList.add('hidden');
+        }
+
+        function showNoResults() {
+            noResults.classList.remove('hidden');
+            companiesGrid.classList.add('hidden');
+            pagination.classList.add('hidden');
+        }
+
+        function hideNoResults() {
+            noResults.classList.add('hidden');
+        }
+
+        function showError(message) {
+            // You can implement a toast notification here
+            console.error(message);
+            alert(message);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+</body>
+</html>
