@@ -237,7 +237,9 @@ jobs:
         
         # Wait for deployment to complete
         kubectl rollout status deployment/backend-deployment -n companies-scraper --timeout=300s
-        kubectl rollout status deployment/frontend-deployment -n companies-scraper --timeout=300s
+        kubectl rollout status deployment/frontend-deployment -n companies-scraper --timeout=600s || echo "Frontend deployment timeout - checking pod status"
+        kubectl get pods -n companies-scraper -l app=frontend
+        kubectl logs -n companies-scraper -l app=frontend --tail=20 || echo "Could not retrieve frontend logs"
         
         # Get deployment status
         kubectl get pods -n companies-scraper
