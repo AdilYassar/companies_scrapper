@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: docker.io/adilyassar/adilyassar-companies_scrapper-frontend:latest
+        image: adilyassar/adilyassar-companies_scrapper-frontend:latest
         ports:
         - containerPort: 80
         livenessProbe:
