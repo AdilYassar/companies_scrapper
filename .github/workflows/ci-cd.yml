@@ -28,12 +28,7 @@ jobs:
         node-version: '18'
 
     - name: Install dependencies
-      run: |
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
+      run: npm install
       continue-on-error: false
 
     - name: Run linting
@@ -65,11 +60,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
+        npm install
 
     - name: Run frontend tests
       run: |
