@@ -1,0 +1,22 @@
+{
+  "name": "selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium tests for Companies Scraper application",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test/*.test.js --timeout 30000",
+    "test:chrome": "BROWSER=chrome npm test",
+    "test:firefox": "BROWSER=firefox npm test",
+    "test:headless": "HEADLESS=true npm test"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.15.0",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.10",
+    "chromedriver": "^119.0.1",
+    "geckodriver": "^4.2.1"
+  },
+  "devDependencies": {
+    "mochawesome": "^7.1.3"
+  }
+}
