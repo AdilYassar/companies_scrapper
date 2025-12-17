@@ -200,7 +200,6 @@ jobs:
     name: Deploy to AKS
     needs: [docker-build-push, security-scan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
     
     steps:
     - name: Checkout code
