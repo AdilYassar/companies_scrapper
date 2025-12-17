@@ -221,11 +221,6 @@ jobs:
 
     - name: Deploy to AKS
       run: |
-        # Replace image tags in deployment files
-        sed -i 's|IMAGE_TAG|${{ github.sha }}|g' k8s/backend-deployment.yaml
-        sed -i 's|IMAGE_TAG|${{ github.sha }}|g' k8s/frontend-deployment.yaml
-        sed -i 's|IMAGE_TAG|${{ github.sha }}|g' k8s/database-deployment.yaml
-        
         # Apply Kubernetes manifests
         kubectl apply -f k8s/namespace.yaml
         kubectl apply -f k8s/configmap.yaml
