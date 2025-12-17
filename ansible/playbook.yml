@@ -1,0 +1,335 @@
+---
+- name: Configure Companies Scraper Infrastructure
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    docker_version: "24.0"
+    node_version: "18"
+    nginx_version: "latest"
+    app_user: "scraper"
+    app_directory: "/opt/companies-scraper"
+    
+  tasks:
+    # Common tasks for all servers
+    - name: Update package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+      
+    - name: Install common packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - htop
+          - vim
+          - ufw
+          - fail2ban
+        state: present
+      when: ansible_os_family == "Debian"
+      
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_directory }}"
+        createhome: yes
+        
+    - name: Configure firewall - allow SSH
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+        
+    - name: Configure firewall - default deny
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+# Web servers configuration
+- name: Configure Web Servers
+  hosts: webservers
+  become: yes
+  
+  tasks:
+    - name: Install Docker dependencies
+      apt:
+        name:
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+        
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+        
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        
+    - name: Add user to docker group
+      user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+        
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+        
+    - name: Install Node.js
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+        apt-get install -y nodejs
+      args:
+        creates: /usr/bin/node
+        
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+        
+    - name: Configure firewall for web services
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - '80'
+        - '443'
+        - '3000'
+        - '3001'
+        
+    - name: Create application directory
+      file:
+        path: "{{ app_directory }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+        
+    - name: Download application code
+      git:
+        repo: https://github.com/AdilYassar/companies_scrapper.git
+        dest: "{{ app_directory }}/app"
+        force: yes
+      become_user: "{{ app_user }}"
+      
+    - name: Install application dependencies
+      npm:
+        path: "{{ app_directory }}/app"
+      become_user: "{{ app_user }}"
+      
+    - name: Create environment file
+      template:
+        src: .env.j2
+        dest: "{{ app_directory }}/app/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+
+# Database servers configuration
+- name: Configure Database Servers
+  hosts: databases
+  become: yes
+  
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name:
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+        state: present
+        
+    - name: Start and enable PostgreSQL
+      systemd:
+        name: postgresql
+        enabled: yes
+        state: started
+        
+    - name: Configure PostgreSQL
+      template:
+        src: postgresql.conf.j2
+        dest: /etc/postgresql/14/main/postgresql.conf
+        backup: yes
+      notify: restart postgresql
+      
+    - name: Configure PostgreSQL authentication
+      template:
+        src: pg_hba.conf.j2
+        dest: /etc/postgresql/14/main/pg_hba.conf
+        backup: yes
+      notify: restart postgresql
+      
+    - name: Create application database
+      postgresql_db:
+        name: companies_scraper
+        state: present
+      become_user: postgres
+      
+    - name: Create application user
+      postgresql_user:
+        name: scraper_user
+        password: "{{ db_password }}"
+        db: companies_scraper
+        priv: ALL
+        state: present
+      become_user: postgres
+      
+    - name: Configure firewall for PostgreSQL
+      ufw:
+        rule: allow
+        port: '5432'
+        proto: tcp
+        src: "{{ item }}"
+      loop:
+        - "10.0.1.10"
+        - "10.0.1.11"
+        
+    - name: Install Redis
+      apt:
+        name: redis-server
+        state: present
+        
+    - name: Configure Redis
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^bind'
+        line: 'bind 0.0.0.0'
+      notify: restart redis
+      
+    - name: Start and enable Redis
+      systemd:
+        name: redis-server
+        enabled: yes
+        state: started
+        
+    - name: Configure firewall for Redis
+      ufw:
+        rule: allow
+        port: '6379'
+        proto: tcp
+        src: "{{ item }}"
+      loop:
+        - "10.0.1.10"
+        - "10.0.1.11"
+
+# Load balancer configuration
+- name: Configure Load Balancers
+  hosts: loadbalancers
+  become: yes
+  
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        
+    - name: Start and enable Nginx
+      systemd:
+        name: nginx
+        enabled: yes
+        state: started
+        
+    - name: Configure Nginx load balancer
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/companies-scraper
+      notify: restart nginx
+      
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/companies-scraper
+        dest: /etc/nginx/sites-enabled/companies-scraper
+        state: link
+      notify: restart nginx
+      
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: restart nginx
+      
+    - name: Configure firewall for load balancer
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - '80'
+        - '443'
+        
+    - name: Install SSL certificate (Let's Encrypt)
+      apt:
+        name: certbot python3-certbot-nginx
+        state: present
+
+# Azure VMs specific configuration
+- name: Configure Azure VMs
+  hosts: azure_vms
+  become: yes
+  
+  tasks:
+    - name: Install Azure CLI
+      shell: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+      args:
+        creates: /usr/bin/az
+        
+    - name: Install kubectl
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+      args:
+        creates: /usr/local/bin/kubectl
+        
+    - name: Install Helm
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+        
+    - name: Configure monitoring agent
+      template:
+        src: azure-monitoring.conf.j2
+        dest: /etc/azure-monitoring.conf
+        
+  handlers:
+    - name: restart postgresql
+      systemd:
+        name: postgresql
+        state: restarted
+        
+    - name: restart redis
+      systemd:
+        name: redis-server
+        state: restarted
+        
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted

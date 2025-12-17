@@ -3,7 +3,13 @@ const config = require('../config');
 
 class SupabaseService {
   constructor() {
-    this.supabase = createClient(config.supabase.url, config.supabase.serviceKey);
+    // Only initialize Supabase if URL is provided and valid
+    if (config.supabase.url && config.supabase.url.startsWith('http')) {
+      this.supabase = createClient(config.supabase.url, config.supabase.serviceKey);
+    } else {
+      this.supabase = null;
+      console.warn('⚠️  Supabase URL not configured or invalid. Supabase features will be disabled.');
+    }
   }
   
   // Company CRUD operations
@@ -167,17 +173,138 @@ class SupabaseService {
     }
   }
   
-  async searchCompanies(searchTerm) {
+  async searchCompanies(searchTerm, filters = {}) {
     try {
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from('companies')
-        .select('*')
-        .textSearch('search_vector', searchTerm);
+        .select('*');
+      
+      // Apply text search - try full-text search first, fallback to in-memory search if it fails
+      if (searchTerm) {
+        // Escape special characters in search term for Postgres
+        const escapedTerm = searchTerm.replace(/'/g, "''");
+        try {
+          query = query.textSearch('search_vector', escapedTerm);
+        } catch (textSearchError) {
+          // If textSearch fails at query building, we'll catch it in the error handler
+          // and use the fallback method
+          throw textSearchError;
+        }
+      }
+      
+      // Apply additional filters
+      if (filters.country) {
+        query = query.eq('country', filters.country);
+      }
+      
+      if (filters.city) {
+        query = query.eq('city', filters.city);
+      }
+      
+      if (filters.industry) {
+        query = query.eq('industry', filters.industry);
+      }
+      
+      if (filters.min_employees) {
+        query = query.gte('employee_count', filters.min_employees);
+      }
+      
+      if (filters.max_employees) {
+        query = query.lte('employee_count', filters.max_employees);
+      }
+      
+      if (filters.has_website) {
+        query = query.not('website', 'is', null);
+      }
+      
+      if (filters.page && filters.limit) {
+        const offset = (filters.page - 1) * filters.limit;
+        query = query.range(offset, offset + filters.limit - 1);
+      }
+      
+      const { data, error } = await query;
+      
+      // If textSearch failed, retry with ILIKE
+      if (error && error.message && (error.message.includes('search_vector') || error.message.includes('column') || error.code === 'PGRST116')) {
+        console.warn('Full-text search failed, retrying with ILIKE fallback');
+        return this.searchCompaniesFallback(searchTerm, filters);
+      }
       
       if (error) throw error;
       return data;
     } catch (error) {
+      // If textSearch completely fails, use fallback
+      if (error.message && (error.message.includes('search_vector') || error.message.includes('column') || error.code === 'PGRST116')) {
+        console.warn('Full-text search failed, using ILIKE fallback');
+        return this.searchCompaniesFallback(searchTerm, filters);
+      }
       console.error('Error searching companies:', error);
+      throw error;
+    }
+  }
+  
+  async searchCompaniesFallback(searchTerm, filters = {}) {
+    try {
+      // First, get all companies matching the filters (without search)
+      let baseQuery = this.supabase
+        .from('companies')
+        .select('*');
+      
+      // Apply filters first
+      if (filters.country) {
+        baseQuery = baseQuery.eq('country', filters.country);
+      }
+      
+      if (filters.city) {
+        baseQuery = baseQuery.eq('city', filters.city);
+      }
+      
+      if (filters.industry) {
+        baseQuery = baseQuery.eq('industry', filters.industry);
+      }
+      
+      if (filters.min_employees) {
+        baseQuery = baseQuery.gte('employee_count', filters.min_employees);
+      }
+      
+      if (filters.max_employees) {
+        baseQuery = baseQuery.lte('employee_count', filters.max_employees);
+      }
+      
+      if (filters.has_website) {
+        baseQuery = baseQuery.not('website', 'is', null);
+      }
+      
+      // Get all matching records (we'll filter by search in memory)
+      const { data: allData, error: baseError } = await baseQuery;
+      
+      if (baseError) throw baseError;
+      
+      // Filter by search term in memory
+      let filteredData = allData || [];
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredData = filteredData.filter(company => {
+          return (
+            (company.company_name && company.company_name.toLowerCase().includes(searchLower)) ||
+            (company.description && company.description.toLowerCase().includes(searchLower)) ||
+            (company.email && company.email.toLowerCase().includes(searchLower)) ||
+            (company.website && company.website.toLowerCase().includes(searchLower)) ||
+            (company.city && company.city.toLowerCase().includes(searchLower)) ||
+            (company.industry && company.industry.toLowerCase().includes(searchLower))
+          );
+        });
+      }
+      
+      // Apply pagination
+      if (filters.page && filters.limit) {
+        const offset = (filters.page - 1) * filters.limit;
+        return filteredData.slice(offset, offset + filters.limit);
+      }
+      
+      return filteredData;
+    } catch (error) {
+      console.error('Error in fallback search:', error);
       throw error;
     }
   }

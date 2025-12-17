@@ -1,0 +1,15 @@
+# Azure Monitoring Configuration
+[logging]
+level = INFO
+file = /var/log/azure-monitoring.log
+
+[metrics]
+enabled = true
+interval = 60
+endpoint = https://monitoring.azure.com
+
+[alerts]
+enabled = true
+cpu_threshold = 80
+memory_threshold = 85
+disk_threshold = 90

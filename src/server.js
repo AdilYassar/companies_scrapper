@@ -1,3 +1,14 @@
+// Polyfill for File API (Node 18 compatibility)
+if (typeof global.File === 'undefined') {
+  global.File = class File extends Blob {
+    constructor(bits, name, options = {}) {
+      super(bits, options);
+      this.name = name;
+      this.lastModified = options.lastModified || Date.now();
+    }
+  };
+}
+
 const app = require('./app');
 const config = require('./config');
 const autoScraper = require('./services/AutoScraperService');

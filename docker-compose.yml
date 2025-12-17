@@ -1,0 +1,110 @@
+services:
+  # PostgreSQL Database
+  database:
+    build:
+      context: .
+      dockerfile: Dockerfile.database
+    container_name: companies-scraper-db
+    environment:
+      POSTGRES_DB: companies_scraper
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - scraper-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Queue Management
+  redis:
+    image: redis:7-alpine
+    container_name: companies-scraper-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - scraper-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: companies-scraper-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@database:5432/companies_scraper
+      SUPABASE_URL: https://trswttabgkzbyggvtsxz.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyc3d0dGFiZ2t6YnlnZ3Z0c3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxNjE1NzQsImV4cCI6MjA3NTczNzU3NH0.pAZnq2xLMwJeEp_3jCFKQ_uujVUVe3i-U-lF9a3u_pk
+      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyc3d0dGFiZ2t6YnlnZ3Z0c3h6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDE2MTU3NCwiZXhwIjoyMDc1NzM3NTc0fQ.KNepgC1lrQ50B9KBlqCAdLdavn8twWcBycbh5H_MR6k
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - scraper-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/usr/src/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: companies-scraper-frontend
+    environment:
+      REACT_APP_API_URL: http://backend:3001/api/v1
+      REACT_APP_API_KEY: b93ddaf670fce54bca61037e49cffe546f33af159d4f34a948446603c4cfbd7a
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - scraper-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  scraper-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

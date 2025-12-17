@@ -1,0 +1,24 @@
+# Database Dockerfile (PostgreSQL with custom initialization)
+FROM postgres:15-alpine
+
+# Set environment variables
+ENV POSTGRES_DB=companies_scraper
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=postgres
+
+# Copy initialization scripts individually
+COPY supabase/migrations/001_create_companies.sql /docker-entrypoint-initdb.d/001_create_companies.sql
+COPY supabase/migrations/002_create_contacts.sql /docker-entrypoint-initdb.d/002_create_contacts.sql
+COPY supabase/migrations/003_create_scraping_jobs.sql /docker-entrypoint-initdb.d/003_create_scraping_jobs.sql
+COPY supabase/migrations/004_create_scraping_logs.sql /docker-entrypoint-initdb.d/004_create_scraping_logs.sql
+COPY supabase/migrations/005_create_triggers.sql /docker-entrypoint-initdb.d/005_create_triggers.sql
+
+# Expose port
+EXPOSE 5432
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD pg_isready -U postgres
+
+# Use default postgres entrypoint
+CMD ["postgres"]

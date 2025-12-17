@@ -33,7 +33,8 @@ class CompanyController {
       let companies;
       
       if (search) {
-        companies = await this.supabaseService.searchCompanies(search);
+        // Combine search with other filters
+        companies = await this.supabaseService.searchCompanies(search, filters);
       } else {
         companies = await this.supabaseService.getCompanies(filters);
       }
