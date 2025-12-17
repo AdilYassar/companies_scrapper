@@ -93,6 +93,9 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     name: Security Scan
+    permissions:
+      security-events: write
+      contents: read
     
     steps:
     - name: Checkout code
@@ -107,8 +110,9 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
+      continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
 
