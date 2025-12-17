@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const Companies = () => {
@@ -12,11 +12,7 @@ const Companies = () => {
   });
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchCompanies();
-  }, [filters]);
-
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -40,7 +36,11 @@ const Companies = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
